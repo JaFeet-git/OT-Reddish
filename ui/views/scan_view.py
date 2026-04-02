@@ -1,6 +1,8 @@
 import customtkinter as ctk
 import nmap
 import threading
+import json
+import os
 from database import add_scan_log
  
 class ScanView(ctk.CTkFrame):
@@ -31,6 +33,8 @@ class ScanView(ctk.CTkFrame):
             ("Quick Scan (Top 100 ports)", "-F -Pn"),
             ("Full Scan (All 65535 ports)", "-p- -Pn"),
             ("OS & Service Detection", "-O -sV -Pn"),
+            ("Intense Technique (Aggressive)", "-T4 -A -v"),
+            ("Modbus Fuzzing / Scripts", "--script modbus-discover,modbus-fuzz -p 502 -Pn"),
             ("OT Specific (Modbus/S7/EIP)", "-p 502,102,44818 -Pn")
         ]
         
@@ -122,8 +126,20 @@ class ScanView(ctk.CTkFrame):
             
         output = f"\n  Results for {target_ip}:\n"
         vulnerabilities_found = []
+        
+        # Load CVE data
+        cve_data = {}
+        cve_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cve_db.json")
+        try:
+            with open(cve_path, 'r') as f:
+                cve_data = json.load(f)
+        except Exception as e:
+            print("Failed to load CVE DB:", e)
+            
         for host in nm.all_hosts():
             output += f"  Host: {host} ({nm[host].hostname()})\n"
+            if 'addresses' in nm[host] and 'mac' in nm[host]['addresses']:
+                output += f"  MAC Address: {nm[host]['addresses']['mac']}\n"
             output += f"  State: {nm[host].state()}\n"
             
             protocols = nm[host].all_protocols()
@@ -151,6 +167,13 @@ class ScanView(ctk.CTkFrame):
                         vuln = f"Port {port} ({protocol_name}) is OPEN - Potential Vulnerability!"
                         vulnerabilities_found.append(vuln)
                         output += f"    [WARNING] {vuln}\n"
+                        
+                        # Cross-reference CVE Database
+                        if protocol_name in cve_data:
+                            for cve_item in cve_data[protocol_name]:
+                                cve_alert = f"      -> [{cve_item['id']}] {cve_item['desc']}"
+                                vulnerabilities_found.append(cve_alert)
+                                output += f"{cve_alert}\n"
                         
         output += "\n"
         self.results_box.insert("end", output)

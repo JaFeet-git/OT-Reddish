@@ -5,6 +5,7 @@ from ui.views.ip_view import IPView
 from ui.views.scan_view import ScanView
 from ui.views.history_view import HistoryView
 from ui.views.settings_view import SettingsView
+from ui.views.login_view import LoginView
 from database import init_db
 
 class App(ctk.CTk):
@@ -27,7 +28,7 @@ class App(ctk.CTk):
 
         # 1. Sidebar Setup
         self.sidebar = Sidebar(self, switch_view_callback=self.switch_view)
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        # self.sidebar.grid(row=0, column=0, sticky="nsew") # Hidden by default until login
 
         # 2. Main Content Area Setup
         self.main_content = ctk.CTkFrame(self, fg_color="transparent")
@@ -37,6 +38,7 @@ class App(ctk.CTk):
         
         # 3. Initialize Views
         self.views = {
+            "Login": LoginView(self.main_content, app=self),
             "IP": IPView(self.main_content, app=self),
             "Scan": ScanView(self.main_content, app=self),
             "History": HistoryView(self.main_content, app=self),
@@ -47,12 +49,13 @@ class App(ctk.CTk):
         self.shared_state = {
             "target_ip": None,
             "scan_results": None,
-            "is_scanning": False
+            "is_scanning": False,
+            "authenticated": False
         }
         
         # Default starting view
         self.current_view = None
-        self.switch_view("IP")
+        self.switch_view("Login")
 
     def switch_view(self, view_name: str):
         if self.current_view == view_name:

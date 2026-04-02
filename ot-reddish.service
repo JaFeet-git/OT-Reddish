@@ -1,0 +1,19 @@
+[Unit]
+Description=OT-Reddish Kiosk Application
+After=network.target graphical.target
+
+[Service]
+# Start specifically as the pi desktop user so the GUI launches
+User=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+WorkingDirectory=/home/pi/OT-Reddish
+
+# Use the virtual environment Python executable
+ExecStart=/home/pi/OT-Reddish/venv/bin/python /home/pi/OT-Reddish/app.py
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

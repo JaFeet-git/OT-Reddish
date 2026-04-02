@@ -1,0 +1,19 @@
+{
+    "Modbus TCP": [
+        {"id": "CVE-2022-26330", "desc": "Improper Authentication in Modbus Server allowing unauthorized command execution."},
+        {"id": "CVE-2015-1025", "desc": "Modbus protocol lack of encryption allows Man-in-the-Middle traffic sniffing."}
+    ],
+    "Siemens S7": [
+        {"id": "CVE-2019-13945", "desc": "Replay Attack vulnerability in S7 communications."},
+        {"id": "CVE-2020-7589", "desc": "Denial of Service via crafted PROFINET packets."}
+    ],
+    "Ethernet/IP": [
+        {"id": "CVE-2021-32986", "desc": "Remote Code Execution via crafted Ethernet/IP headers."}
+    ],
+    "FTP": [
+        {"id": "CVE-CLEAR", "desc": "File Transfer Protocol transmits passwords in plaintext."}
+    ],
+    "Telnet": [
+        {"id": "CVE-CLEAR", "desc": "Telnet transmits all sessions data unencrypted."}
+    ]
+}
