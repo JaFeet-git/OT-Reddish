@@ -1,230 +1,485 @@
 import customtkinter as ctk
 import nmap
 import threading
-import json
-import os
-from database import add_scan_log
+import socket
+import time
+import ipaddress
+from database import add_scan_log, get_vulnerability_matches_by_ports, get_rockwell_cves_preview
+from ui.theme import UI
  
 class ScanView(ctk.CTkFrame):
+    FALLBACK_SUBNET_HOST_LIMIT = 32
+    SOCKET_TIMEOUT_SECONDS = 0.35
+    SERVICE_PORTS = [
+        (21, "ftp"),
+        (22, "ssh"),
+        (23, "telnet"),
+        (80, "http"),
+        (102, "s7comm"),
+        (443, "https"),
+        (502, "modbus-tcp"),
+        (2222, "rockwell-mgmt"),
+        (44818, "ethernet-ip"),
+    ]
+    DISPLAY_COLUMNS = [
+        (21, "FTP"),
+        (22, "SSH"),
+        (23, "TELNET"),
+        (80, "HTTP"),
+        (102, "S7"),
+        (443, "HTTPS"),
+        (502, "MODBUS"),
+        (2222, "RKWL"),
+        (44818, "ENIP"),
+    ]
+
     def __init__(self, master, app):
         super().__init__(master, fg_color="transparent")
         self.app = app
+        self.is_pi_mode = self.app.shared_state.get("pi_mode", False)
+        self.stop_event = threading.Event()
         
-        self.grid_rowconfigure(0, weight=0) # Title
-        self.grid_rowconfigure(1, weight=1) # Checkboxes
-        self.grid_rowconfigure(2, weight=0) # Buttons
-        self.grid_rowconfigure(3, weight=2) # Results
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=0)
+        self.grid_rowconfigure(2, weight=0)
+        self.grid_rowconfigure(3, weight=0)
+        self.grid_rowconfigure(4, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        
-        # Title
-        self.title_label = ctk.CTkLabel(
-            self, 
-            text="Network Scanning", 
-            font=ctk.CTkFont(size=30, weight="bold")
+        self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.header_frame.grid(
+            row=0,
+            column=0,
+            padx=14 if self.is_pi_mode else 28,
+            pady=(10 if self.is_pi_mode else 18, 6 if self.is_pi_mode else 8),
+            sticky="ew"
         )
-        self.title_label.grid(row=0, column=0, padx=20, pady=(15, 10))
-        
-        # Scan Type Selection
-        self.scan_types_frame = ctk.CTkFrame(self)
-        self.scan_types_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+        self.header_frame.grid_columnconfigure(0, weight=1)
+
+        self.title_label = ctk.CTkLabel(
+            self.header_frame,
+            text="Network Scanning",
+            font=ctk.CTkFont(size=22 if self.is_pi_mode else UI.HEADER_SIZE, weight="bold"),
+            text_color=UI.TEXT_PRIMARY
+        )
+        self.title_label.grid(row=0, column=0, sticky="w")
+
+        self.subtitle_label = ctk.CTkLabel(
+            self.header_frame,
+            text="Multithreaded discovery with OT/IT checks: 21, 22, 23, 80, 102, 443, 502, 2222, 44818",
+            font=ctk.CTkFont(size=12 if self.is_pi_mode else UI.SUBHEADER_SIZE),
+            text_color=UI.TEXT_SECONDARY
+        )
+        self.subtitle_label.grid(row=1, column=0, sticky="w", pady=(2, 0))
+
+        self.scan_types_frame = ctk.CTkFrame(self, corner_radius=UI.RADIUS_LG, fg_color=UI.CARD_BG, border_width=1, border_color=UI.BORDER)
+        self.scan_types_frame.grid(row=1, column=0, padx=14 if self.is_pi_mode else 28, pady=(0, 8 if self.is_pi_mode else 10), sticky="ew")
         self.scan_types_frame.grid_columnconfigure(0, weight=1)
-        
-        scan_options = [
-            ("Quick Scan (Top 100 ports)", "-F -Pn"),
-            ("Full Scan (All 65535 ports)", "-p- -Pn"),
-            ("OS & Service Detection", "-O -sV -Pn"),
-            ("Intense Technique (Aggressive)", "-T4 -A -v"),
-            ("Modbus Fuzzing / Scripts", "--script modbus-discover,modbus-fuzz -p 502 -Pn"),
-            ("OT Specific (Modbus/S7/EIP)", "-p 502,102,44818 -Pn")
-        ]
-        
-        self.checkboxes = []
-        for i, (option_text, option_args) in enumerate(scan_options):
-            cb = ctk.CTkCheckBox(
-                self.scan_types_frame, 
-                text=option_text,
-                font=ctk.CTkFont(size=18),
-                onvalue=option_args,
-                offvalue=""
-            )
-            cb.grid(row=i, column=0, padx=20, pady=10, sticky="w")
-            if i == 0:  # Select first by default
-                cb.select()
-            self.checkboxes.append(cb)
-            
-        # Start/Stop Buttons
+        self.scan_types_frame.grid_columnconfigure(1, weight=1)
+
+        self.profile_label = ctk.CTkLabel(
+            self.scan_types_frame,
+            text="Scan Profile",
+            font=ctk.CTkFont(size=UI.BODY_SIZE, weight="bold"),
+            text_color=UI.TEXT_PRIMARY
+        )
+        self.profile_label.grid(row=0, column=0, padx=16, pady=(12, 6), sticky="w")
+
+        self.profile_value = ctk.CTkLabel(
+            self.scan_types_frame,
+            text="Threaded Service Scan (21 / 22 / 23 / 80 / 102 / 443 / 502 / 2222 / 44818)",
+            font=ctk.CTkFont(size=UI.SUBHEADER_SIZE),
+            text_color=UI.TEXT_SECONDARY
+        )
+        self.profile_value.grid(row=1, column=0, padx=16, pady=(0, 12), sticky="w")
+
+        self.scan_state = ctk.CTkLabel(
+            self.scan_types_frame,
+            text="Idle",
+            font=ctk.CTkFont(size=UI.SMALL_SIZE, weight="bold"),
+            text_color=UI.TEXT_SECONDARY,
+            fg_color=UI.CARD_SUBTLE_BG,
+            corner_radius=20,
+            padx=10,
+            pady=5
+        )
+        self.scan_state.grid(row=0, column=1, rowspan=2, padx=16, pady=12, sticky="e")
+
+        self.progress = ctk.CTkProgressBar(self.scan_types_frame, mode="indeterminate")
+        self.progress.grid(row=2, column=0, columnspan=2, padx=16, pady=(0, 12), sticky="ew")
+        self.progress.set(0)
+
         self.button_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.button_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        self.button_frame.grid(row=2, column=0, padx=14 if self.is_pi_mode else 28, pady=0, sticky="ew")
         self.button_frame.grid_columnconfigure(0, weight=1)
         self.button_frame.grid_columnconfigure(1, weight=1)
+        if self.is_pi_mode:
+            self.button_frame.grid_rowconfigure(1, weight=1)
+        else:
+            self.button_frame.grid_columnconfigure(2, weight=1)
         
         self.start_btn = ctk.CTkButton(
             self.button_frame, 
             text="Start Scan",
-            font=ctk.CTkFont(size=20, weight="bold"),
-            fg_color="#4CAF50",
-            hover_color="#45a049",
-            height=50,
+            font=ctk.CTkFont(size=14 if self.is_pi_mode else 20, weight="bold"),
+            fg_color=UI.PRIMARY,
+            hover_color=UI.PRIMARY_HOVER,
+            height=38 if self.is_pi_mode else 50,
             command=self._start_scan
         )
-        self.start_btn.grid(row=0, column=0, padx=10, sticky="ew")
+        self.start_btn.grid(row=0, column=0, padx=6 if self.is_pi_mode else 10, sticky="ew")
         
         self.stop_btn = ctk.CTkButton(
             self.button_frame, 
             text="Stop Scan",
-            font=ctk.CTkFont(size=20, weight="bold"),
-            fg_color="#F44336",
-            hover_color="#d32f2f",
-            height=50,
-            state="disabled"
+            font=ctk.CTkFont(size=14 if self.is_pi_mode else 20, weight="bold"),
+            fg_color=UI.DANGER,
+            hover_color=UI.DANGER_HOVER,
+            height=38 if self.is_pi_mode else 50,
+            state="disabled",
+            command=self._stop_scan
         )
-        self.stop_btn.grid(row=0, column=1, padx=10, sticky="ew")
+        self.stop_btn.grid(row=0, column=1, padx=6 if self.is_pi_mode else 10, sticky="ew")
 
-        # Results Area
-        self.results_box = ctk.CTkTextbox(
-            self,
-            font=ctk.CTkFont(family="Courier", size=14)
+        self.demo_btn = ctk.CTkButton(
+            self.button_frame,
+            text="Demo Mode" if self.is_pi_mode else "Run Demo Mode",
+            font=ctk.CTkFont(size=14 if self.is_pi_mode else 20, weight="bold"),
+            fg_color=UI.CONTROL_BG,
+            hover_color=UI.CONTROL_HOVER,
+            text_color=UI.CONTROL_TEXT,
+            height=34 if self.is_pi_mode else 50,
+            command=self._start_demo_scan
         )
-        self.results_box.grid(row=3, column=0, padx=20, pady=(0, 15), sticky="nsew")
+        if self.is_pi_mode:
+            self.demo_btn.grid(row=1, column=0, columnspan=2, padx=6, pady=(6, 0), sticky="ew")
+        else:
+            self.demo_btn.grid(row=0, column=2, padx=10, sticky="ew")
+
+        self.results_card = ctk.CTkFrame(self, corner_radius=UI.RADIUS_LG, fg_color=UI.CARD_BG, border_width=1, border_color=UI.BORDER)
+        self.results_card.grid(row=4, column=0, padx=14 if self.is_pi_mode else 28, pady=(8 if self.is_pi_mode else 12, 10 if self.is_pi_mode else 16), sticky="nsew")
+        self.results_card.grid_rowconfigure(1, weight=1)
+        self.results_card.grid_columnconfigure(0, weight=1)
+
+        self.results_title = ctk.CTkLabel(
+            self.results_card,
+            text="Scan Output",
+            font=ctk.CTkFont(size=UI.BODY_SIZE, weight="bold"),
+            text_color=UI.TEXT_PRIMARY
+        )
+        self.results_title.grid(row=0, column=0, padx=16, pady=(12, 8), sticky="w")
+
+        self.results_box = ctk.CTkTextbox(
+            self.results_card,
+            font=ctk.CTkFont(family="Courier", size=12 if self.is_pi_mode else 14),
+            corner_radius=UI.RADIUS,
+            fg_color=UI.INPUT_BG
+        )
+        self.results_box.grid(row=1, column=0, padx=16, pady=(0, 14), sticky="nsew")
 
     def _start_scan(self):
         target_ip = self.app.shared_state.get("target_ip")
         if not target_ip:
             self.results_box.insert("end", "Error: No Target IP specified.\n")
             return
-            
-        args = " ".join([cb.get() for cb in self.checkboxes if cb.get() != ""])
-        if not args:
-            args = "-F -Pn" # Default fallback
-            
-        self.start_btn.configure(state="disabled")
-        self.results_box.delete("1.0", "end")
-        self.results_box.insert("end", f"Scanning {target_ip} with args: {args}\n\nRunning...")
-        
-        # Run scan in thread
-        self.app.shared_state["is_scanning"] = True
-        threading.Thread(target=self._run_nmap_scan, args=(target_ip, args), daemon=True).start()
 
-    def _run_nmap_scan(self, target_ip, args):
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.demo_btn.configure(state="disabled")
+        self.scan_state.configure(text="Scanning", text_color=UI.PRIMARY)
+        self.progress.start()
+        self.stop_event.clear()
+        self.results_box.delete("1.0", "end")
+        self.results_box.insert("end", f"Discovering hosts in {target_ip}...\n")
+
+        self.app.shared_state["is_scanning"] = True
+        threading.Thread(target=self._run_threaded_scan, args=(target_ip,), daemon=True).start()
+
+    def _start_demo_scan(self):
+        target_ip = self.app.shared_state.get("target_ip") or "192.168.100.0/24 (DEMO)"
+
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.demo_btn.configure(state="disabled")
+        self.scan_state.configure(text="Demo Running", text_color=UI.WARNING)
+        self.progress.start()
+        self.stop_event.clear()
+        self.results_box.delete("1.0", "end")
+        self.results_box.insert("end", "Demo mode enabled.\nGenerating simulated host results...\n")
+
+        self.app.shared_state["is_scanning"] = True
+        threading.Thread(target=self._run_demo_scan, args=(target_ip,), daemon=True).start()
+
+    def _stop_scan(self):
+        if not self.app.shared_state.get("is_scanning"):
+            return
+        self.stop_event.set()
+        self.scan_state.configure(text="Stopping", text_color=UI.WARNING)
+        self.results_box.insert("end", "\nStopping scan... waiting for worker threads.\n")
+
+    def _run_threaded_scan(self, target_ip):
+        started_at = time.time()
+        fallback_notice = ""
         try:
             nm = nmap.PortScanner()
-            nm.scan(target_ip, arguments=args)
-            
-            # Post results to UI thread safely via after
-            self.after(0, self._process_scan_results, nm, target_ip, args)
+            nm.scan(target_ip, arguments="-sn -n")
+
+            hosts = [host for host in nm.all_hosts() if nm[host].state() == "up"]
+            # If user entered a single IP and host discovery is blocked, still attempt direct scan.
+            if not hosts and "/" not in target_ip and not self.stop_event.is_set():
+                hosts = [target_ip]
+            # Some networks block ping/host discovery. Fall back to direct host attempts for subnets.
+            elif not hosts and "/" in target_ip and not self.stop_event.is_set():
+                try:
+                    network = ipaddress.ip_network(target_ip, strict=False)
+                    candidate_hosts = [str(host) for host in network.hosts()]
+                    if len(candidate_hosts) > self.FALLBACK_SUBNET_HOST_LIMIT:
+                        hosts = candidate_hosts[: self.FALLBACK_SUBNET_HOST_LIMIT]
+                        fallback_notice = (
+                            f"Host discovery blocked. Fast fallback scan enabled for first "
+                            f"{self.FALLBACK_SUBNET_HOST_LIMIT} hosts in {target_ip}."
+                        )
+                    else:
+                        hosts = candidate_hosts
+                        fallback_notice = (
+                            f"Host discovery blocked. Fast fallback scan enabled for all "
+                            f"{len(hosts)} hosts in {target_ip}."
+                        )
+                except ValueError:
+                    hosts = []
+
+            host_results = []
+            results_lock = threading.Lock()
+            workers = []
+
+            for host in hosts:
+                if self.stop_event.is_set():
+                    break
+                worker = threading.Thread(
+                    target=self._scan_single_host_services,
+                    args=(host, host_results, results_lock),
+                    daemon=True
+                )
+                workers.append(worker)
+                worker.start()
+
+            for worker in workers:
+                worker.join()
+
+            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "live", fallback_notice)
         except Exception as e:
             self.after(0, self._handle_scan_error, str(e))
 
-    def _process_scan_results(self, nm, target_ip, args):
+    def _run_demo_scan(self, target_ip):
+        started_at = time.time()
+        try:
+            for _ in range(5):
+                if self.stop_event.is_set():
+                    break
+                time.sleep(0.18)
+
+            host_results = []
+            if not self.stop_event.is_set():
+                host_results = [
+                    {"host": "192.168.100.10", "open_services": [(22, "ssh"), (80, "http"), (443, "https")]},
+                    {"host": "192.168.100.25", "open_services": [(502, "modbus-tcp"), (44818, "ethernet-ip"), (2222, "rockwell-mgmt")]},
+                    {"host": "192.168.100.44", "open_services": [(23, "telnet"), (102, "s7comm")]},
+                ]
+
+            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "demo", "")
+        except Exception as e:
+            self.after(0, self._handle_scan_error, str(e))
+
+    def _scan_single_host_services(self, host, host_results, results_lock):
+        open_services = []
+        for port, service_name in self.SERVICE_PORTS:
+            if self.stop_event.is_set():
+                return
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(self.SOCKET_TIMEOUT_SECONDS)
+            try:
+                if sock.connect_ex((host, port)) == 0:
+                    open_services.append((port, service_name))
+            except OSError:
+                # Ignore per-port socket errors and keep scanning the rest.
+                pass
+            finally:
+                sock.close()
+
+        with results_lock:
+            host_results.append({
+                "host": host,
+                "open_services": open_services
+            })
+
+    def _process_scan_results(self, target_ip, host_results, started_at, scan_mode="live", fallback_notice=""):
         self.app.shared_state["is_scanning"] = False
         self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
+        self.demo_btn.configure(state="normal")
+        self.progress.stop()
         self.results_box.delete("1.0", "end")
-        
-        if not nm.all_hosts():
-            self.results_box.insert("end", "Error: Check connection to the network switch/OT Reddish hardware.\n")
+
+        if self.stop_event.is_set():
+            self.scan_state.configure(text="Stopped", text_color=UI.WARNING)
+            self.results_box.insert("end", "Scan stopped by user.\n")
             return
-            
-        output = f"\n  Results for {target_ip}:\n"
+
+        if not host_results:
+            self.scan_state.configure(text="No hosts found", text_color=UI.WARNING)
+            self.results_box.insert("end", "No active hosts discovered for scanning.\n")
+            return
+
+        duration = time.time() - started_at
+        if scan_mode == "demo":
+            output = f"DEMO MODE: Threaded service scan results for {target_ip}\n"
+        else:
+            output = f"Threaded service scan results for {target_ip}\n"
+        output += f"Hosts scanned: {len(host_results)} | Duration: {duration:.2f}s\n"
+        if fallback_notice:
+            output += f"{fallback_notice}\n"
+        header_columns = " ".join(
+            f"{label}({port})".ljust(12)
+            for port, label in self.DISPLAY_COLUMNS
+        )
+        header_line = f"{'Host':<16} {header_columns}"
+        output += "=" * len(header_line) + "\n"
+        output += header_line + "\n"
+        output += "-" * len(header_line) + "\n"
+
         vulnerabilities_found = []
-        
-        # Load CVE data
-        cve_data = {}
-        cve_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cve_db.json")
-        try:
-            with open(cve_path, 'r') as f:
-                cve_data = json.load(f)
-        except Exception as e:
-            print("Failed to load CVE DB:", e)
-            
-        for host in nm.all_hosts():
-            output += f"  Host: {host} ({nm[host].hostname()})\n"
-            if 'addresses' in nm[host] and 'mac' in nm[host]['addresses']:
-                output += f"  MAC Address: {nm[host]['addresses']['mac']}\n"
-            output += f"  State: {nm[host].state()}\n"
-            
-            protocols = nm[host].all_protocols()
-            if not protocols:
-                output += "  ------------------------------------------------\n  No open ports found.\n  (All scanned ports may be filtered by a firewall)\n"
-                
-            for proto in protocols:
-                output += f"  ------------------------------------------------\n  Protocol : {proto}\n\n"
-                ports = nm[host][proto].keys()
-                for port in sorted(ports):
-                    state = nm[host][proto][port]['state']
-                    service = nm[host][proto][port]['name']
-                    output += f"  • Port : {port:<8} State : {state:<10} Service : {service}\n"
-                    
-                    # Basic vulnerability flagging based on open OT ports
-                    ot_ports = {
-                        502: "Modbus TCP",
-                        102: "Siemens S7",
-                        44818: "Ethernet/IP",
-                        21: "FTP",
-                        23: "Telnet"
+        detailed_vulnerabilities = []
+        for result in sorted(host_results, key=lambda item: item["host"]):
+            host = result["host"]
+            open_ports = {port for port, _ in result["open_services"]}
+            status_columns = " ".join(
+                ("OPEN" if port in open_ports else "closed").ljust(12)
+                for port, _ in self.DISPLAY_COLUMNS
+            )
+            output += f"{host:<16} {status_columns}\n"
+            if open_ports:
+                service_list = ", ".join(service for _, service in result["open_services"])
+                vulnerabilities_found.append(f"{host}: {service_list} open")
+                catalog_matches = get_vulnerability_matches_by_ports(sorted(open_ports))
+                for match in catalog_matches:
+                    detailed_vulnerabilities.append(
+                        {
+                            "host": host,
+                            "port": match["port"],
+                            "protocol": match["protocol"],
+                            "device_software": match["device_software"],
+                            "exploit": match["exploit"]
+                        }
+                    )
+        has_rockwell_context = any(
+            "rockwell" in str(item.get("device_software", "")).lower()
+            or "rockwell" in str(item.get("exploit", "")).lower()
+            for item in detailed_vulnerabilities
+        )
+        if scan_mode == "demo":
+            has_rockwell_context = True
+
+        rockwell_preview = []
+        if has_rockwell_context:
+            rockwell_preview = get_rockwell_cves_preview(limit=5)
+            for cve in rockwell_preview:
+                detailed_vulnerabilities.append(
+                    {
+                        "source": "rockwell_cves",
+                        "vendor": cve["vendor"],
+                        "device_name": cve["device_name"],
+                        "cve_id": cve["cve_id"],
+                        "severity": cve["severity"],
                     }
-                    if state == 'open' and port in ot_ports:
-                        protocol_name = ot_ports.get(port, service)
-                        vuln = f"Port {port} ({protocol_name}) is OPEN - Potential Vulnerability!"
-                        vulnerabilities_found.append(vuln)
-                        output += f"    [WARNING] {vuln}\n"
-                        
-                        # Cross-reference CVE Database
-                        if protocol_name in cve_data:
-                            for cve_item in cve_data[protocol_name]:
-                                cve_alert = f"      -> [{cve_item['id']}] {cve_item['desc']}"
-                                vulnerabilities_found.append(cve_alert)
-                                output += f"{cve_alert}\n"
-                        
-        output += "\n"
+                )
+
+        if detailed_vulnerabilities:
+            output += "\nPotential vulnerability matches (by open port):\n"
+            output += "-" * 76 + "\n"
+            for match in detailed_vulnerabilities:
+                if match.get("source") == "rockwell_cves":
+                    continue
+                output += (
+                    f"- Host {match['host']} port {match['port']} "
+                    f"({match['protocol']}): {match['device_software']} -> {match['exploit']}\n"
+                )
+        if rockwell_preview:
+            output += "\nRockwell CVE preview (mock-up data):\n"
+            output += "-" * 76 + "\n"
+            for cve in rockwell_preview:
+                output += (
+                    f"- {cve['device_name']} | {cve['cve_id']} | "
+                    f"Severity: {cve['severity']}\n"
+                )
+
         self.results_box.insert("end", output)
         self.app.shared_state["scan_results"] = output
-        
-        # Save to database
-        scan_name = "Nmap Scan"
-        if "-F" in args:
-            scan_name = "Quick Scan"
-        elif "-p-" in args:
-            scan_name = "Full Scan"
-        elif "502" in args:
-            scan_name = "OT Specific Scan"
-        elif "-O" in args:
-            scan_name = "OS Detection"
-            
-        add_scan_log(target_ip, scan_name, output)
-        
-        # Show Accept Notification
+        if scan_mode == "demo":
+            self.scan_state.configure(text="Demo Complete", text_color=UI.SUCCESS)
+        else:
+            self.scan_state.configure(text="Completed", text_color=UI.SUCCESS)
+
+        scan_name = "Threaded Service Scan (Demo)" if scan_mode == "demo" else "Threaded Service Scan"
+        add_scan_log(target_ip, scan_name, output, vulnerabilities=detailed_vulnerabilities)
         self._show_scan_complete_notification(target_ip, vulnerabilities_found)
 
     def _show_scan_complete_notification(self, target_ip, vulnerabilities):
         popup = ctk.CTkToplevel(self)
         popup.title("Scan Complete")
-        popup.geometry("500x350")
+        popup.geometry("560x380")
         popup.attributes('-topmost', True)
+        popup.configure(fg_color=UI.MAIN_PANEL_BG)
         
-        lbl = ctk.CTkLabel(popup, text=f"Scan completed for {target_ip}", font=ctk.CTkFont(size=20, weight="bold"))
+        lbl = ctk.CTkLabel(
+            popup,
+            text=f"Scan completed for {target_ip}",
+            font=ctk.CTkFont(size=20, weight="bold"),
+            text_color=UI.TEXT_PRIMARY
+        )
         lbl.pack(pady=(20, 10))
         
         if vulnerabilities:
-            vuln_text = "Devices at risk! The following vulnerabilities were found:\n\n"
+            vuln_text = "Open services found on discovered hosts:\n\n"
             for v in vulnerabilities:
                 vuln_text += f"- {v}\n"
-            detail = ctk.CTkTextbox(popup, font=ctk.CTkFont(size=14), text_color="#F44336")
+            detail = ctk.CTkTextbox(
+                popup,
+                font=ctk.CTkFont(size=14),
+                fg_color=UI.INPUT_BG,
+                text_color=UI.DANGER
+            )
             detail.insert("0.0", vuln_text)
             detail.configure(state="disabled")
             detail.pack(fill="both", expand=True, padx=20, pady=10)
         else:
-            good_lbl = ctk.CTkLabel(popup, text="No immediate vulnerabilities detected.", font=ctk.CTkFont(size=16), text_color="#4CAF50")
+            good_lbl = ctk.CTkLabel(
+                popup,
+                text="No immediate vulnerabilities detected.",
+                font=ctk.CTkFont(size=16),
+                text_color=UI.SUCCESS
+            )
             good_lbl.pack(pady=20)
             
         def on_accept():
             popup.destroy()
             self.app.switch_view("IP")
             
-        accept_btn = ctk.CTkButton(popup, text="Accept", command=on_accept, font=ctk.CTkFont(size=18, weight="bold"), height=40)
+        accept_btn = ctk.CTkButton(
+            popup,
+            text="Accept",
+            command=on_accept,
+            font=ctk.CTkFont(size=18, weight="bold"),
+            fg_color=UI.PRIMARY,
+            hover_color=UI.PRIMARY_HOVER,
+            height=40
+        )
         accept_btn.pack(pady=20)
 
     def _handle_scan_error(self, error):
         self.app.shared_state["is_scanning"] = False
         self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
+        self.demo_btn.configure(state="normal")
+        self.progress.stop()
+        self.scan_state.configure(text="Error", text_color=UI.DANGER)
         self.results_box.delete("1.0", "end")
         self.results_box.insert("end", f"Scan Error: {error}\n")
