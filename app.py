@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import os
+import tkinter as tk
 
 from ui.sidebar import Sidebar
 from ui.views.ip_view import IPView
@@ -17,13 +18,23 @@ class App(ctk.CTk):
         self.title("OT Reddish Scanner")
         force_pi_mode = os.environ.get("OT_REDDISH_PI_MODE", "1").lower() in ("1", "true", "yes")
         self.pi_mode = force_pi_mode
-        if self.pi_mode:
+        self.kiosk_mode = os.environ.get("OT_REDDISH_KIOSK", "0").lower() in ("1", "true", "yes")
+        if self.kiosk_mode:
+            # Kiosk: use full screen; Pi resolution is applied after the window exists.
+            self.geometry("800x480")
+            self.minsize(1, 1)
+        elif self.pi_mode:
             self.geometry("800x480")
             self.minsize(800, 480)
         else:
             self.geometry("1120x680")
             self.minsize(980, 600)
         self.configure(fg_color=UI.APP_BG)
+        if self.kiosk_mode:
+            # Linux / Raspberry Pi: true fullscreen (borderless, uses entire display).
+            self.after(0, self._enter_kiosk_fullscreen)
+            self.bind("<Escape>", self._exit_kiosk_fullscreen)
+            self.bind("<F11>", self._toggle_kiosk_fullscreen)
         
         # Sidebar gets fixed width, content expands.
         self.grid_columnconfigure(0, weight=0, minsize=170 if self.pi_mode else 250)
@@ -39,7 +50,8 @@ class App(ctk.CTk):
             "scan_results": None,
             "is_scanning": False,
             "authenticated": False,
-            "pi_mode": self.pi_mode
+            "pi_mode": self.pi_mode,
+            "kiosk_mode": self.kiosk_mode,
         }
 
         # 1. Sidebar Setup
@@ -109,6 +121,27 @@ class App(ctk.CTk):
             self.main_content.grid(row=0, column=1, columnspan=1, sticky="nsew", padx=(6, 8), pady=8)
         else:
             self.main_content.grid(row=0, column=1, columnspan=1, sticky="nsew", padx=(10, 20), pady=20)
+
+    def _enter_kiosk_fullscreen(self):
+        try:
+            self.attributes("-fullscreen", True)
+        except tk.TclError:
+            pass
+
+    def _exit_kiosk_fullscreen(self, _event=None):
+        try:
+            self.attributes("-fullscreen", False)
+        except Exception:
+            pass
+        return "break"
+
+    def _toggle_kiosk_fullscreen(self, _event=None):
+        try:
+            current = self.attributes("-fullscreen")
+            self.attributes("-fullscreen", not bool(current))
+        except Exception:
+            pass
+        return "break"
 
 if __name__ == "__main__":
     # Default appearance

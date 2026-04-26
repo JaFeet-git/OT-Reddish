@@ -1,19 +1,25 @@
+# Reference unit for “pi@/home/pi/OT-Reddish” — install_usb.sh rewrites this for the real user and paths.
 [Unit]
-Description=OT-Reddish Kiosk Application
+Description=OT-Reddish Scanner (Kiosk)
 After=network.target graphical.target
+Wants=network.target
 
 [Service]
-# Start specifically as the pi desktop user so the GUI launches
+Type=simple
 User=pi
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/pi/.Xauthority
+Group=pi
 WorkingDirectory=/home/pi/OT-Reddish
-
-# Use the virtual environment Python executable
+Environment=HOME=/home/pi
+Environment=DISPLAY=:0
+Environment=OT_REDDISH_PI_MODE=1
+Environment=OT_REDDISH_KIOSK=1
+Environment=XAUTHORITY=/home/pi/.Xauthority
 ExecStart=/home/pi/OT-Reddish/venv/bin/python /home/pi/OT-Reddish/app.py
-
-Restart=always
+Restart=on-failure
 RestartSec=5
+TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=graphical.target
