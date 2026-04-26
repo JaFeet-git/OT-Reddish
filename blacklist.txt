@@ -1,0 +1,8 @@
+# Hosts/subnets to skip during scanning.
+# One entry per line. Supports:
+# - single IP: 138.47.129.40
+# - CIDR subnet: 138.47.129.0/28
+#
+# Example (uncomment to skip localhost):
+# 127.0.0.1
+
