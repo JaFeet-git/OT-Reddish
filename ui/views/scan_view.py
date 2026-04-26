@@ -19,6 +19,9 @@ class ScanView(ctk.CTkFrame):
         (80, "HTTP", "http"),
         (102, "S7", "s7comm"),
         (443, "HTTPS", "https"),
+        (1105, "FTRAN", "ftranhc"),
+        (1217, "HPSS-ND", "hpss-ndapi"),
+        (6001, "X11-1", "X11:1"),
         (2222, "RKWL", "rockwell-mgmt"),
         (44818, "ENIP", "ethernet-ip"),
     ]
@@ -55,7 +58,7 @@ class ScanView(ctk.CTkFrame):
 
         self.subtitle_label = ctk.CTkLabel(
             self.header_frame,
-            text="Multithreaded discovery with OT/IT checks: 21, 22, 23, 80, 102, 443, 502, 2222, 44818",
+            text="Multithreaded discovery: OT/IT + PLC (1105 ftranhc, 1217 hpss-ndapi, 6001 X11) plus FTP, SSH, S7, ENIP, etc.",
             font=ctk.CTkFont(size=12 if self.is_pi_mode else UI.SUBHEADER_SIZE),
             text_color=UI.TEXT_SECONDARY
         )
@@ -89,7 +92,7 @@ class ScanView(ctk.CTkFrame):
         for c in range(cols):
             self.ports_frame.grid_columnconfigure(c, weight=1)
 
-        default_ports = {21, 22, 23, 80, 102, 443, 2222, 44818}
+        default_ports = {21, 22, 23, 80, 102, 443, 1105, 1217, 6001, 2222, 44818}
         for idx, (port, label, service_name) in enumerate(self.PORT_OPTIONS):
             cb = ctk.CTkCheckBox(
                 self.ports_frame,
@@ -308,6 +311,7 @@ class ScanView(ctk.CTkFrame):
                 demo_services = {
                     "192.168.100.10": [(22, "ssh"), (80, "http"), (443, "https")],
                     "192.168.100.25": [(44818, "ethernet-ip"), (2222, "rockwell-mgmt")],
+                    "192.168.100.30": [(1105, "ftranhc"), (1217, "hpss-ndapi"), (6001, "X11:1")],
                     "192.168.100.44": [(23, "telnet"), (102, "s7comm")],
                 }
                 selected_set = set(selected_ports)
