@@ -4,33 +4,23 @@ import threading
 import socket
 import time
 import ipaddress
+import os
 from database import add_scan_log, get_vulnerability_matches_by_ports, get_rockwell_cves_preview
 from ui.theme import UI
  
 class ScanView(ctk.CTkFrame):
     FALLBACK_SUBNET_HOST_LIMIT = 32
     SOCKET_TIMEOUT_SECONDS = 0.35
-    SERVICE_PORTS = [
-        (21, "ftp"),
-        (22, "ssh"),
-        (23, "telnet"),
-        (80, "http"),
-        (102, "s7comm"),
-        (443, "https"),
-        (502, "modbus-tcp"),
-        (2222, "rockwell-mgmt"),
-        (44818, "ethernet-ip"),
-    ]
-    DISPLAY_COLUMNS = [
-        (21, "FTP"),
-        (22, "SSH"),
-        (23, "TELNET"),
-        (80, "HTTP"),
-        (102, "S7"),
-        (443, "HTTPS"),
-        (502, "MODBUS"),
-        (2222, "RKWL"),
-        (44818, "ENIP"),
+    BLACKLIST_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "blacklist.txt")
+    PORT_OPTIONS = [
+        (21, "FTP", "ftp"),
+        (22, "SSH", "ssh"),
+        (23, "TELNET", "telnet"),
+        (80, "HTTP", "http"),
+        (102, "S7", "s7comm"),
+        (443, "HTTPS", "https"),
+        (2222, "RKWL", "rockwell-mgmt"),
+        (44818, "ENIP", "ethernet-ip"),
     ]
 
     def __init__(self, master, app):
@@ -86,11 +76,32 @@ class ScanView(ctk.CTkFrame):
 
         self.profile_value = ctk.CTkLabel(
             self.scan_types_frame,
-            text="Threaded Service Scan (21 / 22 / 23 / 80 / 102 / 443 / 502 / 2222 / 44818)",
+            text="Select ports to scan",
             font=ctk.CTkFont(size=UI.SUBHEADER_SIZE),
             text_color=UI.TEXT_SECONDARY
         )
-        self.profile_value.grid(row=1, column=0, padx=16, pady=(0, 12), sticky="w")
+        self.profile_value.grid(row=1, column=0, padx=16, pady=(0, 6), sticky="w")
+
+        self.port_checks = []
+        self.ports_frame = ctk.CTkFrame(self.scan_types_frame, fg_color="transparent")
+        self.ports_frame.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="ew")
+        cols = 2 if self.is_pi_mode else 4
+        for c in range(cols):
+            self.ports_frame.grid_columnconfigure(c, weight=1)
+
+        default_ports = {21, 22, 23, 80, 102, 443, 2222, 44818}
+        for idx, (port, label, service_name) in enumerate(self.PORT_OPTIONS):
+            cb = ctk.CTkCheckBox(
+                self.ports_frame,
+                text=f"{label} ({port})",
+                font=ctk.CTkFont(size=12 if self.is_pi_mode else 14, weight="bold"),
+            )
+            if port in default_ports:
+                cb.select()
+            r = idx // cols
+            c = idx % cols
+            cb.grid(row=r, column=c, padx=6, pady=4, sticky="w")
+            self.port_checks.append((port, label, service_name, cb))
 
         self.scan_state = ctk.CTkLabel(
             self.scan_types_frame,
@@ -105,7 +116,7 @@ class ScanView(ctk.CTkFrame):
         self.scan_state.grid(row=0, column=1, rowspan=2, padx=16, pady=12, sticky="e")
 
         self.progress = ctk.CTkProgressBar(self.scan_types_frame, mode="indeterminate")
-        self.progress.grid(row=2, column=0, columnspan=2, padx=16, pady=(0, 12), sticky="ew")
+        self.progress.grid(row=3, column=0, columnspan=2, padx=16, pady=(0, 12), sticky="ew")
         self.progress.set(0)
 
         self.button_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -181,6 +192,10 @@ class ScanView(ctk.CTkFrame):
         if not target_ip:
             self.results_box.insert("end", "Error: No Target IP specified.\n")
             return
+        selected_ports = self._get_selected_ports()
+        if not selected_ports:
+            self.results_box.insert("end", "Error: Select at least one port to scan.\n")
+            return
 
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
@@ -189,13 +204,16 @@ class ScanView(ctk.CTkFrame):
         self.progress.start()
         self.stop_event.clear()
         self.results_box.delete("1.0", "end")
-        self.results_box.insert("end", f"Discovering hosts in {target_ip}...\n")
+        self.results_box.insert("end", f"Discovering hosts in {target_ip}...\nPorts: {', '.join(str(p) for p in selected_ports)}\n")
 
         self.app.shared_state["is_scanning"] = True
-        threading.Thread(target=self._run_threaded_scan, args=(target_ip,), daemon=True).start()
+        threading.Thread(target=self._run_threaded_scan, args=(target_ip, selected_ports), daemon=True).start()
 
     def _start_demo_scan(self):
         target_ip = self.app.shared_state.get("target_ip") or "192.168.100.0/24 (DEMO)"
+        selected_ports = self._get_selected_ports()
+        if not selected_ports:
+            selected_ports = [p for (p, _lbl, _svc) in self.PORT_OPTIONS]
 
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
@@ -207,7 +225,7 @@ class ScanView(ctk.CTkFrame):
         self.results_box.insert("end", "Demo mode enabled.\nGenerating simulated host results...\n")
 
         self.app.shared_state["is_scanning"] = True
-        threading.Thread(target=self._run_demo_scan, args=(target_ip,), daemon=True).start()
+        threading.Thread(target=self._run_demo_scan, args=(target_ip, selected_ports), daemon=True).start()
 
     def _stop_scan(self):
         if not self.app.shared_state.get("is_scanning"):
@@ -216,7 +234,7 @@ class ScanView(ctk.CTkFrame):
         self.scan_state.configure(text="Stopping", text_color=UI.WARNING)
         self.results_box.insert("end", "\nStopping scan... waiting for worker threads.\n")
 
-    def _run_threaded_scan(self, target_ip):
+    def _run_threaded_scan(self, target_ip, selected_ports):
         started_at = time.time()
         fallback_notice = ""
         try:
@@ -247,6 +265,14 @@ class ScanView(ctk.CTkFrame):
                 except ValueError:
                     hosts = []
 
+            blacklist_entries = self._load_blacklist()
+            original_count = len(hosts)
+            if blacklist_entries and hosts:
+                hosts = [h for h in hosts if not self._is_blacklisted(h, blacklist_entries)]
+                skipped = original_count - len(hosts)
+                if skipped > 0:
+                    fallback_notice += (("\n" if fallback_notice else "") + f"Blacklisted hosts skipped: {skipped}.")
+
             host_results = []
             results_lock = threading.Lock()
             workers = []
@@ -256,7 +282,7 @@ class ScanView(ctk.CTkFrame):
                     break
                 worker = threading.Thread(
                     target=self._scan_single_host_services,
-                    args=(host, host_results, results_lock),
+                    args=(host, selected_ports, host_results, results_lock),
                     daemon=True
                 )
                 workers.append(worker)
@@ -265,11 +291,11 @@ class ScanView(ctk.CTkFrame):
             for worker in workers:
                 worker.join()
 
-            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "live", fallback_notice)
+            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "live", fallback_notice, selected_ports)
         except Exception as e:
             self.after(0, self._handle_scan_error, str(e))
 
-    def _run_demo_scan(self, target_ip):
+    def _run_demo_scan(self, target_ip, selected_ports):
         started_at = time.time()
         try:
             for _ in range(5):
@@ -279,26 +305,31 @@ class ScanView(ctk.CTkFrame):
 
             host_results = []
             if not self.stop_event.is_set():
-                host_results = [
-                    {"host": "192.168.100.10", "open_services": [(22, "ssh"), (80, "http"), (443, "https")]},
-                    {"host": "192.168.100.25", "open_services": [(502, "modbus-tcp"), (44818, "ethernet-ip"), (2222, "rockwell-mgmt")]},
-                    {"host": "192.168.100.44", "open_services": [(23, "telnet"), (102, "s7comm")]},
-                ]
+                demo_services = {
+                    "192.168.100.10": [(22, "ssh"), (80, "http"), (443, "https")],
+                    "192.168.100.25": [(44818, "ethernet-ip"), (2222, "rockwell-mgmt")],
+                    "192.168.100.44": [(23, "telnet"), (102, "s7comm")],
+                }
+                selected_set = set(selected_ports)
+                for host, services in demo_services.items():
+                    filtered = [(p, s) for (p, s) in services if p in selected_set]
+                    host_results.append({"host": host, "open_services": filtered})
 
-            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "demo", "")
+            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "demo", "", selected_ports)
         except Exception as e:
             self.after(0, self._handle_scan_error, str(e))
 
-    def _scan_single_host_services(self, host, host_results, results_lock):
+    def _scan_single_host_services(self, host, selected_ports, host_results, results_lock):
         open_services = []
-        for port, service_name in self.SERVICE_PORTS:
+        service_by_port = {p: svc for (p, _lbl, svc, _cb) in self.port_checks}
+        for port in selected_ports:
             if self.stop_event.is_set():
                 return
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(self.SOCKET_TIMEOUT_SECONDS)
             try:
                 if sock.connect_ex((host, port)) == 0:
-                    open_services.append((port, service_name))
+                    open_services.append((port, service_by_port.get(port, "unknown")))
             except OSError:
                 # Ignore per-port socket errors and keep scanning the rest.
                 pass
@@ -311,7 +342,7 @@ class ScanView(ctk.CTkFrame):
                 "open_services": open_services
             })
 
-    def _process_scan_results(self, target_ip, host_results, started_at, scan_mode="live", fallback_notice=""):
+    def _process_scan_results(self, target_ip, host_results, started_at, scan_mode="live", fallback_notice="", selected_ports=None):
         self.app.shared_state["is_scanning"] = False
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
@@ -337,10 +368,10 @@ class ScanView(ctk.CTkFrame):
         output += f"Hosts scanned: {len(host_results)} | Duration: {duration:.2f}s\n"
         if fallback_notice:
             output += f"{fallback_notice}\n"
-        header_columns = " ".join(
-            f"{label}({port})".ljust(12)
-            for port, label in self.DISPLAY_COLUMNS
-        )
+        display_cols = [(p, lbl) for (p, lbl, _svc, cb) in self.port_checks if cb.get() == 1]
+        if not display_cols:
+            display_cols = [(p, lbl) for (p, lbl, _svc) in self.PORT_OPTIONS]
+        header_columns = " ".join(f"{label}({port})".ljust(12) for port, label in display_cols)
         header_line = f"{'Host':<16} {header_columns}"
         output += "=" * len(header_line) + "\n"
         output += header_line + "\n"
@@ -353,7 +384,7 @@ class ScanView(ctk.CTkFrame):
             open_ports = {port for port, _ in result["open_services"]}
             status_columns = " ".join(
                 ("OPEN" if port in open_ports else "closed").ljust(12)
-                for port, _ in self.DISPLAY_COLUMNS
+                for port, _ in display_cols
             )
             output += f"{host:<16} {status_columns}\n"
             if open_ports:
@@ -421,6 +452,38 @@ class ScanView(ctk.CTkFrame):
         scan_name = "Threaded Service Scan (Demo)" if scan_mode == "demo" else "Threaded Service Scan"
         add_scan_log(target_ip, scan_name, output, vulnerabilities=detailed_vulnerabilities)
         self._show_scan_complete_notification(target_ip, vulnerabilities_found)
+
+    def _get_selected_ports(self):
+        return [port for (port, _lbl, _svc, cb) in self.port_checks if cb.get() == 1]
+
+    def _load_blacklist(self):
+        entries = []
+        if not os.path.exists(self.BLACKLIST_FILE):
+            return entries
+        with open(self.BLACKLIST_FILE, "r", encoding="utf-8") as handle:
+            for raw in handle:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                entries.append(line)
+        return entries
+
+    def _is_blacklisted(self, host, entries):
+        try:
+            host_ip = ipaddress.ip_address(host)
+        except ValueError:
+            return False
+        for entry in entries:
+            try:
+                if "/" in entry:
+                    if host_ip in ipaddress.ip_network(entry, strict=False):
+                        return True
+                else:
+                    if host_ip == ipaddress.ip_address(entry):
+                        return True
+            except ValueError:
+                continue
+        return False
 
     def _show_scan_complete_notification(self, target_ip, vulnerabilities):
         popup = ctk.CTkToplevel(self)
