@@ -10,6 +10,7 @@ from ui.views.settings_view import SettingsView
 from ui.views.login_view import LoginView
 from ui.theme import UI
 from database import init_db
+from ui.views.hydra_view import HydraView
 
 class App(ctk.CTk):
     def __init__(self):
@@ -77,7 +78,8 @@ class App(ctk.CTk):
             "IP": IPView(self.main_content, app=self),
             "Scan": ScanView(self.main_content, app=self),
             "History": HistoryView(self.main_content, app=self),
-            "Settings": SettingsView(self.main_content, app=self)
+            "Settings": SettingsView(self.main_content, app=self),
+            "Hydra": HydraView(self.main_content, app=self)
         }
         
         # Default starting view
