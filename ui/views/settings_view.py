@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from database import wipe_scan_history
 from ui.theme import UI
 
 class SettingsView(ctk.CTkFrame):
@@ -89,9 +90,17 @@ class SettingsView(ctk.CTkFrame):
             fg_color=UI.DANGER,
             hover_color=UI.DANGER_HOVER,
             height=40,
-            state="disabled"
+            command=self._confirm_wipe
         )
         self.wipe_btn.grid(row=3, column=1, rowspan=2, padx=24, pady=(14, 20), sticky="e")
+
+        self.wipe_status = ctk.CTkLabel(
+            self.settings_frame,
+            text="",
+            font=ctk.CTkFont(size=UI.SMALL_SIZE, weight="bold"),
+            text_color=UI.TEXT_SECONDARY
+        )
+        self.wipe_status.grid(row=5, column=0, columnspan=2, padx=24, pady=(0, 14), sticky="w")
         
     def _toggle_theme(self):
         if self.theme_switch.get() == 1:
@@ -100,3 +109,66 @@ class SettingsView(ctk.CTkFrame):
         else:
             ctk.set_appearance_mode("light")
             self.theme_switch.configure(text="Light Mode")
+
+    def _confirm_wipe(self):
+        popup = ctk.CTkToplevel(self)
+        popup.title("Confirm Factory Reset")
+        popup.geometry("460x220")
+        popup.attributes("-topmost", True)
+        popup.configure(fg_color=UI.MAIN_PANEL_BG)
+        popup.grab_set()
+
+        title = ctk.CTkLabel(
+            popup,
+            text="Delete all scan history?",
+            font=ctk.CTkFont(size=20, weight="bold"),
+            text_color=UI.TEXT_PRIMARY
+        )
+        title.pack(pady=(24, 10))
+
+        subtitle = ctk.CTkLabel(
+            popup,
+            text="This action removes saved scan logs and cannot be undone.",
+            font=ctk.CTkFont(size=UI.SUBHEADER_SIZE),
+            text_color=UI.TEXT_SECONDARY
+        )
+        subtitle.pack(padx=24)
+
+        btn_row = ctk.CTkFrame(popup, fg_color="transparent")
+        btn_row.pack(fill="x", padx=24, pady=22)
+        btn_row.grid_columnconfigure(0, weight=1)
+        btn_row.grid_columnconfigure(1, weight=1)
+
+        cancel_btn = ctk.CTkButton(
+            btn_row,
+            text="Cancel",
+            fg_color=UI.CONTROL_BG,
+            hover_color=UI.CONTROL_HOVER,
+            text_color=UI.CONTROL_TEXT,
+            command=popup.destroy
+        )
+        cancel_btn.grid(row=0, column=0, padx=(0, 8), sticky="ew")
+
+        confirm_btn = ctk.CTkButton(
+            btn_row,
+            text="Wipe",
+            fg_color=UI.DANGER,
+            hover_color=UI.DANGER_HOVER,
+            command=lambda: self._wipe_data(popup)
+        )
+        confirm_btn.grid(row=0, column=1, padx=(8, 0), sticky="ew")
+
+    def _wipe_data(self, popup):
+        try:
+            deleted_rows = wipe_scan_history()
+            self.wipe_status.configure(
+                text=f"Factory reset complete. Deleted {deleted_rows} scan log(s).",
+                text_color=UI.SUCCESS
+            )
+        except Exception as exc:
+            self.wipe_status.configure(
+                text=f"Factory reset failed: {exc}",
+                text_color=UI.DANGER
+            )
+        finally:
+            popup.destroy()

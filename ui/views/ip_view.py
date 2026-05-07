@@ -167,7 +167,7 @@ class IPView(ctk.CTkFrame):
         else:
             self.pi_hint = ctk.CTkLabel(
                 self.target_frame,
-                text="Pi mode: use keyboard input, then tap Confirm.",
+                # text="Pi mode: use keyboard input, then tap Confirm.",
                 font=ctk.CTkFont(size=UI.SMALL_SIZE),
                 text_color=UI.TEXT_SECONDARY
             )

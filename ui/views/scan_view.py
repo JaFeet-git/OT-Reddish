@@ -58,7 +58,7 @@ class ScanView(ctk.CTkFrame):
 
         self.subtitle_label = ctk.CTkLabel(
             self.header_frame,
-            text="Multithreaded discovery: OT/IT + PLC (1105 ftranhc, 1217 hpss-ndapi, 6001 X11) plus FTP, SSH, S7, ENIP, etc.",
+            # text="Multithreaded discovery: OT/IT + PLC (1105 ftranhc, 1217 hpss-ndapi, 6001 X11) plus FTP, SSH, S7, ENIP, etc.",
             font=ctk.CTkFont(size=12 if self.is_pi_mode else UI.SUBHEADER_SIZE),
             text_color=UI.TEXT_SECONDARY
         )
@@ -126,10 +126,6 @@ class ScanView(ctk.CTkFrame):
         self.button_frame.grid(row=2, column=0, padx=14 if self.is_pi_mode else 28, pady=0, sticky="ew")
         self.button_frame.grid_columnconfigure(0, weight=1)
         self.button_frame.grid_columnconfigure(1, weight=1)
-        if self.is_pi_mode:
-            self.button_frame.grid_rowconfigure(1, weight=1)
-        else:
-            self.button_frame.grid_columnconfigure(2, weight=1)
         
         self.start_btn = ctk.CTkButton(
             self.button_frame, 
@@ -153,21 +149,6 @@ class ScanView(ctk.CTkFrame):
             command=self._stop_scan
         )
         self.stop_btn.grid(row=0, column=1, padx=6 if self.is_pi_mode else 10, sticky="ew")
-
-        self.demo_btn = ctk.CTkButton(
-            self.button_frame,
-            text="Demo Mode" if self.is_pi_mode else "Run Demo Mode",
-            font=ctk.CTkFont(size=14 if self.is_pi_mode else 20, weight="bold"),
-            fg_color=UI.CONTROL_BG,
-            hover_color=UI.CONTROL_HOVER,
-            text_color=UI.CONTROL_TEXT,
-            height=34 if self.is_pi_mode else 50,
-            command=self._start_demo_scan
-        )
-        if self.is_pi_mode:
-            self.demo_btn.grid(row=1, column=0, columnspan=2, padx=6, pady=(6, 0), sticky="ew")
-        else:
-            self.demo_btn.grid(row=0, column=2, padx=10, sticky="ew")
 
         self.results_card = ctk.CTkFrame(self, corner_radius=UI.RADIUS_LG, fg_color=UI.CARD_BG, border_width=1, border_color=UI.BORDER)
         self.results_card.grid(row=4, column=0, padx=14 if self.is_pi_mode else 28, pady=(8 if self.is_pi_mode else 12, 10 if self.is_pi_mode else 16), sticky="nsew")
@@ -202,7 +183,6 @@ class ScanView(ctk.CTkFrame):
 
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
-        self.demo_btn.configure(state="disabled")
         self.scan_state.configure(text="Scanning", text_color=UI.PRIMARY)
         self.progress.start()
         self.stop_event.clear()
@@ -211,24 +191,6 @@ class ScanView(ctk.CTkFrame):
 
         self.app.shared_state["is_scanning"] = True
         threading.Thread(target=self._run_threaded_scan, args=(target_ip, selected_ports), daemon=True).start()
-
-    def _start_demo_scan(self):
-        target_ip = self.app.shared_state.get("target_ip") or "192.168.100.0/24 (DEMO)"
-        selected_ports = self._get_selected_ports()
-        if not selected_ports:
-            selected_ports = [p for (p, _lbl, _svc) in self.PORT_OPTIONS]
-
-        self.start_btn.configure(state="disabled")
-        self.stop_btn.configure(state="normal")
-        self.demo_btn.configure(state="disabled")
-        self.scan_state.configure(text="Demo Running", text_color=UI.WARNING)
-        self.progress.start()
-        self.stop_event.clear()
-        self.results_box.delete("1.0", "end")
-        self.results_box.insert("end", "Demo mode enabled.\nGenerating simulated host results...\n")
-
-        self.app.shared_state["is_scanning"] = True
-        threading.Thread(target=self._run_demo_scan, args=(target_ip, selected_ports), daemon=True).start()
 
     def _stop_scan(self):
         if not self.app.shared_state.get("is_scanning"):
@@ -294,32 +256,7 @@ class ScanView(ctk.CTkFrame):
             for worker in workers:
                 worker.join()
 
-            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "live", fallback_notice, selected_ports)
-        except Exception as e:
-            self.after(0, self._handle_scan_error, str(e))
-
-    def _run_demo_scan(self, target_ip, selected_ports):
-        started_at = time.time()
-        try:
-            for _ in range(5):
-                if self.stop_event.is_set():
-                    break
-                time.sleep(0.18)
-
-            host_results = []
-            if not self.stop_event.is_set():
-                demo_services = {
-                    "192.168.100.10": [(22, "ssh"), (80, "http"), (443, "https")],
-                    "192.168.100.25": [(44818, "ethernet-ip"), (2222, "rockwell-mgmt")],
-                    "192.168.100.30": [(1105, "ftranhc"), (1217, "hpss-ndapi"), (6001, "X11:1")],
-                    "192.168.100.44": [(23, "telnet"), (102, "s7comm")],
-                }
-                selected_set = set(selected_ports)
-                for host, services in demo_services.items():
-                    filtered = [(p, s) for (p, s) in services if p in selected_set]
-                    host_results.append({"host": host, "open_services": filtered})
-
-            self.after(0, self._process_scan_results, target_ip, host_results, started_at, "demo", "", selected_ports)
+            self.after(0, self._process_scan_results, target_ip, host_results, started_at, fallback_notice)
         except Exception as e:
             self.after(0, self._handle_scan_error, str(e))
 
@@ -346,11 +283,10 @@ class ScanView(ctk.CTkFrame):
                 "open_services": open_services
             })
 
-    def _process_scan_results(self, target_ip, host_results, started_at, scan_mode="live", fallback_notice="", selected_ports=None):
+    def _process_scan_results(self, target_ip, host_results, started_at, fallback_notice=""):
         self.app.shared_state["is_scanning"] = False
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
-        self.demo_btn.configure(state="normal")
         self.progress.stop()
         self.results_box.delete("1.0", "end")
 
@@ -365,10 +301,7 @@ class ScanView(ctk.CTkFrame):
             return
 
         duration = time.time() - started_at
-        if scan_mode == "demo":
-            output = f"DEMO MODE: Threaded service scan results for {target_ip}\n"
-        else:
-            output = f"Threaded service scan results for {target_ip}\n"
+        output = f"Threaded service scan results for {target_ip}\n"
         output += f"Hosts scanned: {len(host_results)} | Duration: {duration:.2f}s\n"
         if fallback_notice:
             output += f"{fallback_notice}\n"
@@ -410,8 +343,6 @@ class ScanView(ctk.CTkFrame):
             or "rockwell" in str(item.get("exploit", "")).lower()
             for item in detailed_vulnerabilities
         )
-        if scan_mode == "demo":
-            has_rockwell_context = True
 
         rockwell_preview = []
         if has_rockwell_context:
@@ -448,13 +379,8 @@ class ScanView(ctk.CTkFrame):
 
         self.results_box.insert("end", output)
         self.app.shared_state["scan_results"] = output
-        if scan_mode == "demo":
-            self.scan_state.configure(text="Demo Complete", text_color=UI.SUCCESS)
-        else:
-            self.scan_state.configure(text="Completed", text_color=UI.SUCCESS)
-
-        scan_name = "Threaded Service Scan (Demo)" if scan_mode == "demo" else "Threaded Service Scan"
-        add_scan_log(target_ip, scan_name, output, vulnerabilities=detailed_vulnerabilities)
+        self.scan_state.configure(text="Completed", text_color=UI.SUCCESS)
+        add_scan_log(target_ip, "Threaded Service Scan", output, vulnerabilities=detailed_vulnerabilities)
         self._show_scan_complete_notification(target_ip, vulnerabilities_found)
 
     def _get_selected_ports(self):
@@ -545,7 +471,6 @@ class ScanView(ctk.CTkFrame):
         self.app.shared_state["is_scanning"] = False
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
-        self.demo_btn.configure(state="normal")
         self.progress.stop()
         self.scan_state.configure(text="Error", text_color=UI.DANGER)
         self.results_box.delete("1.0", "end")
