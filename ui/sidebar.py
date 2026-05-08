@@ -47,6 +47,7 @@ class Sidebar(ctk.CTkFrame):
         nav_items = [
             ("IP", "IP Setup"),
             ("Scan", "Network Scan"),
+            ("Hydra", "Hydra Module"),
             ("History", "History Log"),
             ("Settings", "Settings")
         ]

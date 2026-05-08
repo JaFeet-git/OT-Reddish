@@ -231,6 +231,14 @@ class HistoryView(ctk.CTkFrame):
                         f"- [Rockwell CVE] {entry.get('device_name', 'Unknown device')} | "
                         f"{entry.get('cve_id', 'N/A')} | Severity: {entry.get('severity', 'N/A')}\n"
                     )
+                elif entry.get("source") == "offline_cve_text":
+                    textbox.insert(
+                        "end",
+                        f"- [Offline CVE] {entry.get('vendor', 'Unknown vendor')} | "
+                        f"{entry.get('device_name', 'Unknown device')} | {entry.get('cve_id', 'N/A')} | "
+                        f"Severity: {entry.get('severity', 'N/A')} | "
+                        f"Attack Complexity: {entry.get('attack_complexity', 'N/A')}\n"
+                    )
                 else:
                     textbox.insert(
                         "end",
@@ -241,7 +249,19 @@ class HistoryView(ctk.CTkFrame):
             textbox.insert("end", "\nDetailed Scan Output:\n")
             textbox.insert("end", "--------------------------------------\n")
         textbox.insert("end", self.selected_log['results'])
+        self._highlight_open_statuses(textbox)
         textbox.configure(state="disabled") # readonly
+
+    def _highlight_open_statuses(self, textbox):
+        textbox.tag_config("status_open", foreground=UI.SUCCESS)
+        search_from = "1.0"
+        while True:
+            match_start = textbox.search("OPEN", search_from, stopindex="end")
+            if not match_start:
+                break
+            match_end = f"{match_start}+4c"
+            textbox.tag_add("status_open", match_start, match_end)
+            search_from = match_end
 
     def _delete_selected_log(self):
         if not self.selected_log: return

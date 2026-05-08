@@ -6,6 +6,7 @@ import time
 import ipaddress
 import os
 from database import add_scan_log, get_vulnerability_matches_by_ports, get_rockwell_cves_preview
+from database import get_offline_cve_matches
 from ui.theme import UI
  
 class ScanView(ctk.CTkFrame):
@@ -58,6 +59,7 @@ class ScanView(ctk.CTkFrame):
 
         self.subtitle_label = ctk.CTkLabel(
             self.header_frame,
+            text="",
             # text="Multithreaded discovery: OT/IT + PLC (1105 ftranhc, 1217 hpss-ndapi, 6001 X11) plus FTP, SSH, S7, ENIP, etc.",
             font=ctk.CTkFont(size=12 if self.is_pi_mode else UI.SUBHEADER_SIZE),
             text_color=UI.TEXT_SECONDARY
@@ -170,6 +172,7 @@ class ScanView(ctk.CTkFrame):
             fg_color=UI.INPUT_BG
         )
         self.results_box.grid(row=1, column=0, padx=16, pady=(0, 14), sticky="nsew")
+        self.results_box.tag_config("status_open", foreground=UI.SUCCESS)
 
     def _start_scan(self):
         target_ip = self.app.shared_state.get("target_ip")
@@ -316,6 +319,7 @@ class ScanView(ctk.CTkFrame):
 
         vulnerabilities_found = []
         detailed_vulnerabilities = []
+        catalog_context_matches = []
         for result in sorted(host_results, key=lambda item: item["host"]):
             host = result["host"]
             open_ports = {port for port, _ in result["open_services"]}
@@ -328,6 +332,7 @@ class ScanView(ctk.CTkFrame):
                 service_list = ", ".join(service for _, service in result["open_services"])
                 vulnerabilities_found.append(f"{host}: {service_list} open")
                 catalog_matches = get_vulnerability_matches_by_ports(sorted(open_ports))
+                catalog_context_matches.extend(catalog_matches)
                 for match in catalog_matches:
                     detailed_vulnerabilities.append(
                         {
@@ -338,6 +343,20 @@ class ScanView(ctk.CTkFrame):
                             "exploit": match["exploit"]
                         }
                     )
+
+        offline_cve_matches = get_offline_cve_matches(catalog_context_matches, limit=6)
+        for cve in offline_cve_matches:
+            detailed_vulnerabilities.append(
+                {
+                    "source": "offline_cve_text",
+                    "vendor": cve["vendor"],
+                    "device_name": cve["device_name"],
+                    "cve_id": cve["cve_id"],
+                    "severity": cve["severity"],
+                    "attack_complexity": cve.get("attack_complexity", "UNKNOWN"),
+                    "score": cve.get("score", 0),
+                }
+            )
         has_rockwell_context = any(
             "rockwell" in str(item.get("device_software", "")).lower()
             or "rockwell" in str(item.get("exploit", "")).lower()
@@ -362,11 +381,19 @@ class ScanView(ctk.CTkFrame):
             output += "\nPotential vulnerability matches (by open port):\n"
             output += "-" * 76 + "\n"
             for match in detailed_vulnerabilities:
-                if match.get("source") == "rockwell_cves":
+                if match.get("source") in {"rockwell_cves", "offline_cve_text"}:
                     continue
                 output += (
                     f"- Host {match['host']} port {match['port']} "
                     f"({match['protocol']}): {match['device_software']} -> {match['exploit']}\n"
+                )
+        if offline_cve_matches:
+            output += "\nOffline CVE matches (local file correlation):\n"
+            output += "-" * 76 + "\n"
+            for cve in offline_cve_matches:
+                output += (
+                    f"- {cve['vendor']} | {cve['device_name']} | {cve['cve_id']} | "
+                    f"Severity: {cve['severity']} | Attack Complexity: {cve.get('attack_complexity', 'UNKNOWN')}\n"
                 )
         if rockwell_preview:
             output += "\nRockwell CVE preview (mock-up data):\n"
@@ -378,6 +405,7 @@ class ScanView(ctk.CTkFrame):
                 )
 
         self.results_box.insert("end", output)
+        self._highlight_open_statuses()
         self.app.shared_state["scan_results"] = output
         self.scan_state.configure(text="Completed", text_color=UI.SUCCESS)
         add_scan_log(target_ip, "Threaded Service Scan", output, vulnerabilities=detailed_vulnerabilities)
@@ -385,6 +413,16 @@ class ScanView(ctk.CTkFrame):
 
     def _get_selected_ports(self):
         return [port for (port, _lbl, _svc, cb) in self.port_checks if cb.get() == 1]
+
+    def _highlight_open_statuses(self):
+        search_from = "1.0"
+        while True:
+            match_start = self.results_box.search("OPEN", search_from, stopindex="end")
+            if not match_start:
+                break
+            match_end = f"{match_start}+4c"
+            self.results_box.tag_add("status_open", match_start, match_end)
+            search_from = match_end
 
     def _load_blacklist(self):
         entries = []

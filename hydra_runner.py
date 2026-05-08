@@ -1,6 +1,8 @@
 import os
 import shutil
+import socket
 import subprocess
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -13,6 +15,19 @@ SERVICES = {
     "22": "ssh",
     "23": "telnet",
 }
+SOCKET_CHECK_TIMEOUT_SECONDS = 1.5
+HYDRA_TIMEOUT_SECONDS = 180
+
+
+def _is_port_reachable(ip, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(SOCKET_CHECK_TIMEOUT_SECONDS)
+    try:
+        return sock.connect_ex((ip, int(port))) == 0
+    except OSError:
+        return False
+    finally:
+        sock.close()
 
 
 def run_hydra_check(ip, port):
@@ -35,10 +50,18 @@ def run_hydra_check(ip, port):
 
     service = SERVICES[port]
 
-    # If running in Linux/WSL, use hydra directly
+    if not _is_port_reachable(ip, port):
+        return (
+            f"Error: {ip}:{port} is not reachable right now. "
+            "Verify host is online, service is listening, and firewall rules allow access.\n"
+        )
+
+    # Linux/macOS path: use hydra directly.
     if os.name != "nt":
         if shutil.which("hydra") is None:
-            return "Error: Hydra is not installed in WSL/Linux.\n"
+            if sys.platform == "darwin":
+                return "Error: Hydra is not installed or not in PATH. On macOS run: brew install hydra\n"
+            return "Error: Hydra is not installed or not in PATH.\n"
 
         command = [
             "hydra",
@@ -46,52 +69,75 @@ def run_hydra_check(ip, port):
             "-P", str(PASS_FILE),
             "-s", port,
             "-t", "1",
-            "-W", "5",
+            "-w", "5",
+            "-W", "1",
             "-I",
             "-f",
             ip,
             service,
         ]
 
-    # If running in Windows, call Hydra through WSL
+    # Windows path: prefer native hydra.exe/hydra in PATH, fallback to WSL.
     else:
-        wsl_exe = shutil.which("wsl.exe") or shutil.which("wsl")
+        hydra_exe = shutil.which("hydra.exe") or shutil.which("hydra")
+        if hydra_exe:
+            command = [
+                hydra_exe,
+                "-L", str(USER_FILE),
+                "-P", str(PASS_FILE),
+                "-s", port,
+                "-t", "1",
+                "-w", "5",
+                "-W", "1",
+                "-I",
+                "-f",
+                ip,
+                service,
+            ]
+        else:
+            wsl_exe = shutil.which("wsl.exe") or shutil.which("wsl")
+            if not wsl_exe:
+                return (
+                    "Error: Hydra is not available on Windows PATH and WSL is not installed. "
+                    "Install Hydra natively or enable WSL + Hydra.\n"
+                )
 
-        if not wsl_exe:
-            return "Error: WSL is not available from Windows.\n"
+            def to_wsl_path(path):
+                p = str(path).replace("\\", "/")
+                drive, rest = p.split(":", 1)
+                return f"/mnt/{drive.lower()}{rest}"
 
-        def to_wsl_path(path):
-            p = str(path).replace("\\", "/")
-            drive, rest = p.split(":", 1)
-            return f"/mnt/{drive.lower()}{rest}"
-
-        command = [
-            wsl_exe,
-            "hydra",
-            "-L", to_wsl_path(USER_FILE),
-            "-P", to_wsl_path(PASS_FILE),
-            "-s", port,
-            "-t", "1",
-            "-W", "5",
-            "-I",
-            "-f",
-            ip,
-            service,
-        ]
+            command = [
+                wsl_exe,
+                "hydra",
+                "-L", to_wsl_path(USER_FILE),
+                "-P", to_wsl_path(PASS_FILE),
+                "-s", port,
+                "-t", "1",
+                "-w", "5",
+                "-W", "1",
+                "-I",
+                "-f",
+                ip,
+                service,
+            ]
 
     try:
         result = subprocess.run(
             command,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=HYDRA_TIMEOUT_SECONDS,
         )
 
         output = result.stdout + result.stderr
         return output if output.strip() else "No results returned.\n"
 
     except subprocess.TimeoutExpired:
-        return "Error: Hydra scan timed out.\n"
+        return (
+            f"Error: Hydra scan timed out after {HYDRA_TIMEOUT_SECONDS}s. "
+            "Try a smaller wordlist or verify target service responsiveness.\n"
+        )
 
     except Exception as e:
         return f"Error: {str(e)}\n"

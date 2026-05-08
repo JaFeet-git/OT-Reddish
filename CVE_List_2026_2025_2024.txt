@@ -1,0 +1,141 @@
+vendor, Product, CVE_Code, Severity, Attack_Complexity
+Schneider Electric, Saitel DR RTU, CVE-2025-9997, MEDIUM, LOW
+Schneider Electric, Saitel DR RTU, CVE-2025-9996, MEDIUM, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9466, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9465, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9464, HIGH, LOW
+Rockwell Automation, ArmorStart AOP, CVE-2025-9437, HIGH, LOW
+Rockwell Automation, 432ES-IG3 Series A, CVE-2025-9368, HIGH, LOW
+Rockwell Automation, FactoryTalk® Analytics™ LogixAI®, CVE-2025-9364, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9283, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9282, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9281, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9280, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9279, HIGH, LOW
+Rockwell Automation, ArmorStart® LT, CVE-2025-9278, HIGH, LOW
+Rockwell Automation, 1715-AENTR EtherNet/IP Adapter, CVE-2025-9178, HIGH, LOW
+Rockwell Automation, 1715-AENTR EtherNet/IP Adapter, CVE-2025-9177, HIGH, LOW
+Rockwell Automation, ControlLogix® 5580, CVE-2025-9166, HIGH, LOW
+Rockwell Automation, FactoryTalk Optix, CVE-2025-9161, HIGH, HIGH
+Rockwell Automation, CompactLogix® 5480, CVE-2025-9160, HIGH, LOW
+Rockwell Automation, Compact GuardLogix® 5370, CVE-2025-9124, HIGH, LOW
+Rockwell Automation, FactoryTalk Linx, CVE-2025-9068, HIGH, LOW
+Rockwell Automation, FactoryTalk Linx, CVE-2025-9067, HIGH, LOW
+Rockwell Automation, FactoryTalk ViewPoint, CVE-2025-9066, HIGH, LOW
+Rockwell Automation, ThinManager, CVE-2025-9065, HIGH, LOW
+Rockwell Automation, FactoryTalk View Machine Edition, CVE-2025-9064, HIGH, LOW
+Rockwell Automation, PanelView Plus 7 Performance Series B, CVE-2025-9063, HIGH, LOW
+Rockwell Automation, FLEX 5000 I/O, CVE-2025-9042, HIGH, LOW
+Rockwell Automation, FLEX 5000 I/O, CVE-2025-9041, HIGH, LOW
+Rockwell Automation, FactoryTalk® Action Manager, CVE-2025-9036, HIGH, LOW
+Rockwell Automation, Verve® Asset Manager, CVE-2024-9412, HIGH, LOW
+Schneider Electric, PowerLogic PM5320, CVE-2024-9409, HIGH, LOW
+Rockwell Automation, Drives - PowerFlex 6000T, CVE-2024-9124, HIGH, LOW
+Schneider Electric, EcoStruxure Power Monitoring Expert (PME), CVE-2024-9005, HIGH, HIGH
+Schneider Electric, Saitel DR RTU, CVE-2025-8453, HIGH, LOW
+Rockwell Automation, 1756-ENT2R, 1756-EN4TR, 1756-EN4TRXT, CVE-2025-8008, HIGH, LOW
+Rockwell Automation, 1756-ENT2R, 1756-EN4TR, 1756-EN4TRXT, CVE-2025-8007, HIGH, LOW
+Schneider Electric, Modicon M340 CPU (part numbers BMXP34*), CVE-2024-8938, CRITICAL, HIGH
+Schneider Electric, Modicon M340 CPU (part numbers BMXP34*), CVE-2024-8937, HIGH, HIGH
+Schneider Electric, Modicon M340 CPU (part numbers BMXP34*), CVE-2024-8936, HIGH, HIGH
+Schneider Electric, Modicon M340 CPU (part numbers BMXP34*), CVE-2024-8935, HIGH, HIGH
+Schneider Electric, Modicon M340 CPU (part numbers BMXP34*), CVE-2024-8933, HIGH, HIGH
+Rockwell Automation, CompactLogix 5380 controllers, CVE-2024-8626, HIGH, LOW
+Rockwell Automation, 2800C OptixPanel™ Compact, CVE-2024-8533, HIGH, HIGH
+Rockwell Automation, FactoryTalk® ViewPoint, CVE-2025-7973, HIGH, LOW
+Rockwell Automation, FactoryTalk® Linx, CVE-2025-7972, HIGH, LOW
+Rockwell Automation, Studio 5000 Logix Designer®, CVE-2025-7971, HIGH, HIGH
+Rockwell Automation, FactoryTalk Activation Manager, CVE-2025-7970, HIGH, LOW
+Rockwell Automation, 5032-CFGB16M12P5DR, CVE-2025-7774, HIGH, LOW
+Rockwell Automation, 5032-CFGB16M12P5DR, CVE-2025-7773, HIGH, LOW
+Schneider Electric, ATV630/650/660/680/6A0/6B0/6L0 Altivar Process Drives, CVE-2025-7746, MEDIUM, LOW
+Rockwell Automation, PLC - Micro850 L50E, CVE-2025-7693, CRITICAL, LOW
+Rockwell Automation, 1756-EN2T/D, CVE-2025-7353, CRITICAL, LOW
+Rockwell Automation, Stratix IOS, CVE-2025-7350, HIGH, LOW
+Rockwell Automation, Comms - 1783-NATR, CVE-2025-7330, HIGH, LOW
+Rockwell Automation, Comms - 1783-NATR, CVE-2025-7329, HIGH, LOW
+Rockwell Automation, Comms - 1783-NATR, CVE-2025-7328, CRITICAL, LOW
+Rockwell Automation, Arena® Simulation, CVE-2025-7033, HIGH, LOW
+Rockwell Automation, Arena® Simulation, CVE-2025-7032, HIGH, LOW
+Rockwell Automation, Arena® Simulation, CVE-2025-7025, HIGH, LOW
+Rockwell Automation, ThinManager® ThinServer™, CVE-2024-7988, CRITICAL, LOW
+Rockwell Automation, ThinManager® ThinServer™, CVE-2024-7987, HIGH, LOW
+Rockwell Automation, ThinManager® ThinServer™, CVE-2024-7986, MEDIUM, LOW
+Rockwell Automation, Pavilion8®, CVE-2024-7961, HIGH, LOW
+Rockwell Automation, Pavilion8®, CVE-2024-7960, HIGH, LOW
+Rockwell Automation, RSLogix 500®, CVE-2024-7847, HIGH, HIGH
+Rockwell Automation, PLC - Micro850/870 (2080 -L50E/2080 -L70E), CVE-2024-7567, MEDIUM, LOW
+Rockwell Automation, CompactLogix 5380 (5069-L3z), CVE-2024-7515, HIGH, LOW
+Rockwell Automation, FactoryTalk View Site Edition, CVE-2024-7513, HIGH, LOW
+Rockwell Automation, CompactLogix 5380 (5069 – L3z), CVE-2024-7507, HIGH, LOW
+Schneider Electric, EcoStruxure™ Power Monitoring Expert, CVE-2025-6788, MEDIUM, LOW
+Schneider Electric, Modicon M340, CVE-2025-6625, HIGH, LOW
+Schneider Electric, EcoStruxure™ IT Data Center Expert, CVE-2025-6438, MEDIUM, LOW
+Rockwell Automation, Arena®, CVE-2025-6377, HIGH, HIGH
+Rockwell Automation, Arena®, CVE-2025-6376, HIGH, HIGH
+Rockwell Automation, SequenceManager™, CVE-2024-6436, HIGH, LOW
+Rockwell Automation, Pavilion8®, CVE-2024-6435, HIGH, LOW
+Rockwell Automation, FactoryTalk® System Services (installed via FTPM), CVE-2024-6326, LOW, LOW
+Rockwell Automation, FactoryTalk® System Services (installed via FTPM), CVE-2024-6325, MEDIUM, LOW
+Rockwell Automation, ControlLogix® 5580 (1756-L8z), CVE-2024-6242, HIGH, LOW
+Rockwell Automation, ControlLogix® 5580, CVE-2024-6207, HIGH, LOW
+Rockwell Automation, 5015 - AENFTXT, CVE-2024-6089, HIGH, LOW
+Rockwell Automation, Emulate3D™, CVE-2024-6079, MEDIUM, HIGH
+Rockwell Automation, DataMosaix™, CVE-2024-6078, HIGH, LOW
+Rockwell Automation, CompactLogix 5380, CVE-2024-6077, HIGH, LOW
+Rockwell Automation, Arena Input Analyzer, CVE-2024-6068, HIGH, LOW
+Schneider Electric, EVLink WallBox, CVE-2025-5743, HIGH, LOW
+Schneider Electric, EVLink WallBox, CVE-2025-5742, MEDIUM, LOW
+Schneider Electric, EVLink WallBox, CVE-2025-5741, MEDIUM, LOW
+Schneider Electric, EVLink WallBox, CVE-2025-5740, HIGH, LOW
+Schneider Electric, SESU, CVE-2025-5296, HIGH, LOW
+Rockwell Automation, ThinManager® ThinServer™, CVE-2024-5990, HIGH, LOW
+Rockwell Automation, ThinManager® ThinServer™, CVE-2024-5989, CRITICAL, LOW
+Rockwell Automation, ThinManager® ThinServer™, CVE-2024-5988, CRITICAL, LOW
+Rockwell Automation, ControlLogix® 5580, CVE-2024-5659, HIGH, LOW
+Schneider Electric, Easergy MiCOM P14x, CVE-2026-4832, MEDIUM, LOW
+Rockwell Automation, FactoryTalk® View SE, CVE-2024-4609, HIGH, LOW
+Schneider Electric, EcoStruxure™ Power Build Rapsody software, CVE-2025-3916, MEDIUM, LOW
+Schneider Electric, Modicon Controllers M241/M251, CVE-2025-3905, MEDIUM, LOW
+Schneider Electric, Modicon Controllers M241/M251, CVE-2025-3899, MEDIUM, LOW
+Schneider Electric, Modicon Controllers M241/M251, CVE-2025-3898, HIGH, LOW
+Rockwell Automation, ThinManager, CVE-2025-3618, HIGH, LOW
+Rockwell Automation, ThinManager®, CVE-2025-3617, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-3289, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-3288, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-3287, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-3286, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-3285, HIGH, LOW
+Schneider Electric, Modicon Controllers M241/M251, CVE-2025-3117, MEDIUM, LOW
+Schneider Electric, Modicon Controllers M241/M251, CVE-2025-3116, HIGH, LOW
+Schneider Electric, Modicon Controllers M241/M251, CVE-2025-3112, HIGH, LOW
+Rockwell Automation, FactoryTalk® Remote Access™, CVE-2024-3640, HIGH, LOW
+Schneider Electric, PowerChute™ Serial Shutdown, CVE-2026-2405, MEDIUM, LOW
+Schneider Electric, PowerChute™ Serial Shutdown, CVE-2026-2404, MEDIUM, LOW
+Schneider Electric, PowerChute™ Serial Shutdown, CVE-2026-2403, MEDIUM, LOW
+Schneider Electric, PowerChute™ Serial Shutdown, CVE-2026-2402, MEDIUM, LOW
+Schneider Electric, PowerChute™ Serial Shutdown, CVE-2026-2401, LOW, LOW
+Schneider Electric, PowerChute™ Serial Shutdown, CVE-2026-2400, MEDIUM, LOW
+Schneider Electric, PowerChute™ Serial Shutdown, CVE-2026-2399, MEDIUM, LOW
+Schneider Electric, EcoStruxure™ Automation Expert, CVE-2026-2273, HIGH, LOW
+Schneider Electric, Modicon Controllers M241 / M251, CVE-2025-2875, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-2829, HIGH, LOW
+Schneider Electric, Trio Q Licensed Data Radio, CVE-2025-2442, MEDIUM, LOW
+Schneider Electric, Trio Q Licensed Data Radio, CVE-2025-2441, MEDIUM, LOW
+Schneider Electric, Trio Q Licensed Data Radio, CVE-2025-2440, MEDIUM, HIGH
+Rockwell Automation, Arena®, CVE-2025-2293, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-2288, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-2287, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-2286, HIGH, LOW
+Rockwell Automation, Arena®, CVE-2025-2285, HIGH, LOW
+Schneider Electric, ConneXium Network Manager, CVE-2025-2223, HIGH, LOW
+Schneider Electric, ConneXium Network Manager, CVE-2025-2222, HIGH, LOW
+Schneider Electric, EcoStruxure Panel Server, CVE-2025-2002, MEDIUM, LOW
+Schneider Electric, EcoStruxure™ Foxboro DCS, CVE-2026-1286, HIGH, LOW
+Schneider Electric, EcoStruxure Building Operation Workstation, CVE-2026-1227, HIGH, LOW
+Schneider Electric, EcoStruxure Building Operation Workstation, CVE-2026-1226, HIGH, LOW
+Rockwell Automation, Verve Asset Manager, CVE-2025-1449, HIGH, LOW
+Schneider Electric, ASCO 5310 Single-Channel Remote Annunciator, CVE-2025-1070, HIGH, LOW
+Schneider Electric, ASCO 5310 Single-Channel Remote Annunciator, CVE-2025-1060, HIGH, LOW
+Schneider Electric, ASCO 5310 Single-Channel Remote Annunciator, CVE-2025-1059, HIGH, LOW
+Schneider Electric, ASCO 5310 Single-Channel Remote Annunciator, CVE-2025-1058, HIGH, LOW

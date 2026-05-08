@@ -6,7 +6,7 @@ from ui.theme import UI
 def get_hardware_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # Doesn't have to be reachable
+        # maybe doesn't have to be reachable? might be better to use local address confirm with team.
         s.connect(('10.255.255.255', 1))
         ip = s.getsockname()[0]
     except Exception:
@@ -167,6 +167,7 @@ class IPView(ctk.CTkFrame):
         else:
             self.pi_hint = ctk.CTkLabel(
                 self.target_frame,
+                text="",
                 # text="Pi mode: use keyboard input, then tap Confirm.",
                 font=ctk.CTkFont(size=UI.SMALL_SIZE),
                 text_color=UI.TEXT_SECONDARY
