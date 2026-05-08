@@ -1,2 +1,9 @@
 admin
+user
+guest
+person
 test
+login
+root
+username
+champions

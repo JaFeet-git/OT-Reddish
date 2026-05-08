@@ -4,10 +4,12 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
+LOG_FILE = Path("hydra_results.log")
+
+
 DB_FILE = Path("scans.db")
 USER_FILE = Path("user.txt")
 PASS_FILE = Path("pass.txt")
-LOG_FILE = Path("hydra_results.log")
 
 SERVICES = {
     21: "ftp",

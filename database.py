@@ -191,17 +191,6 @@ def delete_log(log_id):
     conn.commit()
     conn.close()
 
-def wipe_scan_history():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM scan_history")
-    deleted_rows = cursor.fetchone()[0]
-    cursor.execute("DELETE FROM scan_history")
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name = 'scan_history'")
-    conn.commit()
-    conn.close()
-    return deleted_rows
-
 def _decode_vulnerabilities(raw_value):
     if not raw_value:
         return []
