@@ -152,6 +152,9 @@ class HydraView(ctk.CTkFrame):
             font=ctk.CTkFont(family="Courier", size=12 if self.is_pi_mode else 14)
         )
         self.output_box.grid(row=5, column=0, columnspan=2, padx=16, pady=(0, 14), sticky="nsew")
+        self.output_box.tag_config("hydra_success", foreground=UI.SUCCESS)
+        self.output_box.tag_config("hydra_error", foreground=UI.DANGER)
+        self.output_box.tag_config("hydra_meta", foreground=self._resolve_ui_color(UI.TEXT_SECONDARY))
 
     def _clear_output(self):
         self.output_box.delete("1.0", "end")
@@ -168,7 +171,7 @@ class HydraView(ctk.CTkFrame):
         self._is_running = True
         self.run_btn.configure(state="disabled")
         self.status_label.configure(text="Running Hydra check...", text_color=UI.PRIMARY)
-        self.output_box.insert("end", f"\n[Hydra] Target {target_ip}:{self.port_var.get()} started...\n")
+        self._append_output_line(f"\n[Hydra] Target {target_ip}:{self.port_var.get()} started...", "hydra_meta")
         self.output_box.see("end")
 
         threading.Thread(
@@ -185,6 +188,47 @@ class HydraView(ctk.CTkFrame):
         self._is_running = False
         self.run_btn.configure(state="normal")
         self.status_label.configure(text="Completed", text_color=UI.SUCCESS)
-        self.output_box.insert("end", f"[Hydra] Target {target_ip}:{port} completed.\n")
-        self.output_box.insert("end", output if output.endswith("\n") else f"{output}\n")
+        self._append_output_line(f"[Hydra] Target {target_ip}:{port} completed.", "hydra_meta")
+        self._append_hydra_output(output)
         self.output_box.see("end")
+
+    def _append_output_line(self, line, tag=None):
+        text = line if line.endswith("\n") else f"{line}\n"
+        if tag:
+            self.output_box.insert("end", text, tag)
+        else:
+            self.output_box.insert("end", text)
+
+    def _append_hydra_output(self, output):
+        normalized = output if output.endswith("\n") else f"{output}\n"
+        for line in normalized.splitlines():
+            tag = self._classify_hydra_line(line)
+            display_line = line
+            if tag == "hydra_success":
+                # CTkTextbox does not support per-tag bold fonts; use strong marker for visibility.
+                display_line = f"*** VALID CREDENTIAL FOUND *** {line}"
+            self._append_output_line(display_line, tag)
+
+    def _classify_hydra_line(self, line):
+        lower = line.lower()
+        if "login:" in lower and "password:" in lower:
+            return "hydra_success"
+
+        error_markers = (
+            "error:",
+            "timed out",
+            "not reachable",
+            "failed",
+            "exception",
+            "cannot",
+        )
+        if any(marker in lower for marker in error_markers):
+            return "hydra_error"
+
+        return None
+
+    def _resolve_ui_color(self, color_value):
+        if isinstance(color_value, (tuple, list)) and len(color_value) >= 2:
+            mode = ctk.get_appearance_mode().lower()
+            return color_value[1] if mode == "dark" else color_value[0]
+        return color_value
